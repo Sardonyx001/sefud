@@ -21,6 +21,7 @@ will be implementing this features one by one:
 - [ ] database:
   - [ ] sqlite (for now?)
   - [ ] redis (for caching?)
+  - [ ] use ULIDs + some URL shortening method?
 - [ ] background jobs:
   - [ ] antivirus scanning
   - [ ] nsfw scanning
