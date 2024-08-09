@@ -7,7 +7,19 @@ inspired by 0x0.st and waifuvault.moe and other similar services.
 will try to make this project adhere mostly to what 0x0.st offers
 so i can use it as an alternative.
 
-## todos
+## how?
+
+~for devs: run and watch
+
+```sh
+air --build.cmd "go build cmd/sefud/main.go" --build.bin "tmp/sefud"
+```
+
+```
+
+```
+
+## todo?
 
 will be implementing this features one by one:
 
