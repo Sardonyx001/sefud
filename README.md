@@ -23,6 +23,9 @@ air --build.cmd "go build -o tmp/sefud cmd/sefud/main.go" --build.bin "tmp/sefud
 
 will be implementing this features one by one:
 
+- [ ] basic:
+  - [x] hello world
+  - [ ] bootstrap db
 - [ ] api:
   - [ ] simple file upload & download
   - [ ] encrypt files with a password
