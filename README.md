@@ -12,7 +12,7 @@ so i can use it as an alternative.
 ~for devs: run and watch
 
 ```sh
-air --build.cmd "go build cmd/sefud/main.go" --build.bin "tmp/sefud"
+air --build.cmd "go build -o tmp/sefud cmd/sefud/main.go" --build.bin "tmp/sefud"
 ```
 
 ```
