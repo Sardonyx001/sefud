@@ -22,11 +22,16 @@ func New() *Server {
 		TimeFormat:      time.RFC3339,
 	})
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogURI:    true,
-		LogStatus: true,
-		LogMethod: true,
+		LogURI:     true,
+		LogStatus:  true,
+		LogMethod:  true,
+		LogLatency: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			logger.Info("request")
+			logger.Info("http",
+				"method", v.Method,
+				"uri", v.URI,
+				"status", v.Status,
+				"latency", v.Latency)
 
 			return nil
 		},
