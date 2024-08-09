@@ -1,8 +1,7 @@
 package server
 
 import (
-	"net/http"
-
+	"github.com/Sardonyx001/sefud/handlers"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -17,9 +16,10 @@ func New() *Server {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
+	// Routes
+	e.POST("/up", handlers.UploadFile)
+	e.GET("/:id", handlers.DownloadFile)
+	e.DELETE("/:id", handlers.DeleteFile)
 
 	return &Server{
 		echo: e,
