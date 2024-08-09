@@ -1,16 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"time"
+	"github.com/Sardonyx001/sefud/server"
 )
 
-func greet(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello World! %s", time.Now())
-}
-
 func main() {
-	http.HandleFunc("/", greet)
-	http.ListenAndServe(":8080", nil)
+	s := server.New()
+	if err := s.Start(); err != nil {
+		panic(err)
+	}
 }
