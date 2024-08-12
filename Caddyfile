@@ -1,0 +1,4 @@
+localhost {
+  reverse_proxy /sefud/* sefud:7000
+}
+

@@ -1,0 +1,25 @@
+services:
+  sefud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SEFUD_APP_PORT=7000
+      - SEFUD_STORAGE_PATH=/uploads
+      - SEFUD_MIME_BLACKLIST=application/x-msdownload,application/x-sh
+      - MAX_CONTENT_LENGTH=10485760
+      - DATABASE_URL=your_database_url
+    volumes:
+      - ./uploads:/uploads
+    ports:
+      - "7000:7000"
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - sefud
