@@ -15,10 +15,6 @@ so i can use it as an alternative.
 air --build.cmd "go build -o tmp/sefud cmd/sefud/main.go" --build.bin "tmp/sefud"
 ```
 
-```
-
-```
-
 ## todo?
 
 will be implementing this features one by one:
@@ -42,6 +38,17 @@ will be implementing this features one by one:
   - [ ] nsfw scanning
   - [ ] automate file deletion
 - [ ] cli tool
-  - ( curl might be just enough + i already wrote [pb.fish](https://github.com/Sardonyx001/pb.fish) for 0x0.st)
+  - ( curl might be just enough + i already wrote [pb.fish](https://github.com/Sardonyx001/pb.fish) for 0x0.st and co.)
 
-Thats all for now!
+## project structure
+
+sefud/
+├── cmd/
+│ └── sefud/
+│ └── main.go
+├── server/
+│ └── server.go
+├── handlers/
+│ ├── upload.go
+│ ├── download.go
+│ └── delete.go
