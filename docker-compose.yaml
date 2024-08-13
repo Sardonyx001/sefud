@@ -12,8 +12,17 @@ services:
     volumes:
       - ./uploads:/uploads
     ports:
-      - "7000:7000"
-
+      - "${DOCKER_EXPOSE_APP_PORT}:${APP_PORT}"
+    depends_on:
+      - db
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DOCKER_EXPOSE_DB_PORT}:${DB_PORT}"
   caddy:
     image: caddy:2
     ports:
@@ -23,3 +32,4 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
     depends_on:
       - sefud
+      - db

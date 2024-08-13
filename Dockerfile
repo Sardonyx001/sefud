@@ -9,7 +9,7 @@ RUN go build -o sefud ./cmd/sefud
 FROM debian:bullseye-slim
 
 COPY --from=builder /app/sefud /usr/local/bin/sefud
-EXPOSE 7000
+EXPOSE ${APP_PORT}
 
 ENTRYPOINT ["/usr/local/bin/sefud"]
 
