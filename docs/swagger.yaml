@@ -1,0 +1,107 @@
+basePath: /
+host: localhost:7000
+info:
+  contact:
+    name: API Support
+    url: https://github.com/Sardonyx001/sefud
+  description: Simple, encrypted file upload & download service
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: sefud API
+  version: "1.0"
+paths:
+  /{id}:
+    delete:
+      description: Delete a file by its ID
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File deleted successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: File not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a file
+      tags:
+      - files
+    get:
+      description: Download a file by its ID
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: File content
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Download a file
+      tags:
+      - files
+  /up:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file to the server
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File uploaded successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Upload a file
+      tags:
+      - files
+schemes:
+- http
+- https
+swagger: "2.0"
