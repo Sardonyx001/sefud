@@ -1,3 +1,4 @@
+// Package config provides configuration settings for the sefud application.
 package config
 
 type DBConfig struct {

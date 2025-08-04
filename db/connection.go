@@ -1,7 +1,10 @@
+// Package db provides functions to initialize a database connection.
+// It uses GORM with PostgreSQL as the database driver.
 package db
 
 import (
 	"fmt"
+
 	"github.com/Sardonyx001/sefud/config"
 	"github.com/charmbracelet/log"
 

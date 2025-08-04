@@ -1,3 +1,5 @@
+// Package config provides configuration settings for the sefud application.
+// It handles loading environment variables and provides structured access to configuration values.
 package config
 
 import (

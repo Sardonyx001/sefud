@@ -1,3 +1,4 @@
+// Package logger provides HTTP request logging middleware for the Echo web framework.
 package logger
 
 import (

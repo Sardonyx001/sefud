@@ -1,3 +1,4 @@
+// Package main is the entry point for the sefud file upload/download server.
 package main
 
 import (
