@@ -2,12 +2,17 @@
 package main
 
 import (
+	"log"
+
+	"github.com/Sardonyx001/sefud/config"
 	"github.com/Sardonyx001/sefud/server"
 )
 
 func main() {
-	s := server.New()
-	if err := s.Start(); err != nil {
-		panic(err)
+	cfg := config.NewConfig()
+
+	s := server.New(cfg)
+	if err := s.Start(cfg.App.Port); err != nil {
+		log.Fatalf("Failed to start server, port already used?: %v", err)
 	}
 }
