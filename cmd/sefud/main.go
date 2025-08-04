@@ -27,8 +27,12 @@ import (
 func main() {
 	cfg := config.NewConfig()
 
-	s := server.New(cfg)
+	s, err := server.New(cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize server: %v", err)
+	}
+
 	if err := s.Start(cfg.App.Port); err != nil {
-		log.Fatalf("Failed to start server, port already used?: %v", err)
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }

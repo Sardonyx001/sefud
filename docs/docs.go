@@ -24,7 +24,7 @@ const docTemplate = `{
     "paths": {
         "/up": {
             "post": {
-                "description": "Upload a file to the server",
+                "description": "Upload a file to R2 storage with high-performance chunked upload",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -42,28 +42,43 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Expiration duration (e.g., '24h', '7d')",
+                        "name": "expires",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "File uploaded successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.UploadResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad request - invalid file or parameters",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "File too large",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported media type",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -71,7 +86,7 @@ const docTemplate = `{
         },
         "/{id}": {
             "get": {
-                "description": "Download a file by its ID",
+                "description": "Download a file by its ID with streaming support and range requests",
                 "produces": [
                     "application/octet-stream"
                 ],
@@ -82,10 +97,16 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "File ID",
+                        "description": "File ID (UUID)",
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range header for partial content requests",
+                        "name": "Range",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -95,24 +116,43 @@ const docTemplate = `{
                             "type": "file"
                         }
                     },
+                    "206": {
+                        "description": "Partial file content",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid file ID",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "File not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "File expired",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
             },
             "delete": {
-                "description": "Delete a file by its ID",
+                "description": "Delete a file by its ID using delete token for authorization",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -123,9 +163,16 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "File ID",
+                        "description": "File ID (UUID)",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Delete token for authorization",
+                        "name": "token",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -133,24 +180,95 @@ const docTemplate = `{
                     "200": {
                         "description": "File deleted successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.DeleteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid delete token",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "File not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "File already deleted or expired",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.DeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.UploadResponse": {
+            "type": "object",
+            "properties": {
+                "content_type": {
+                    "type": "string"
+                },
+                "delete_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "original_name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
                 }
             }
         }
