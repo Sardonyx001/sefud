@@ -1,3 +1,4 @@
+// Package server initializes and runs the HTTP server for file upload/download.
 package server
 
 import (
