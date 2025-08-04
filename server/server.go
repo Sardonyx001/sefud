@@ -8,6 +8,7 @@ import (
 	"github.com/Sardonyx001/sefud/logger"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"gorm.io/gorm"
 )
 
@@ -23,10 +24,13 @@ func New(cfg *config.Config) *Server {
 	e.Use(logger.InitLoggerMiddleware())
 	e.Use(middleware.Recover())
 
-	// Routes
+	// API Routes
 	e.POST("/up", handlers.UploadFile)
 	e.GET("/:id", handlers.DownloadFile)
 	e.DELETE("/:id", handlers.DeleteFile)
+
+	// Swagger documentation route
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	return &Server{
 		echo:   e,
