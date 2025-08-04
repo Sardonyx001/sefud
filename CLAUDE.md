@@ -26,6 +26,12 @@ go mod download    # Install dependencies
 go mod tidy       # Clean up dependencies
 ```
 
+### Swagger Documentation
+```bash
+go generate ./...                    # Regenerate Swagger docs automatically
+swag init -g cmd/sefud/main.go     # Manual regeneration
+```
+
 ## Architecture
 
 ### Tech Stack
@@ -46,6 +52,7 @@ go mod tidy       # Clean up dependencies
 - `POST /up` - File upload
 - `GET /:id` - File download by ID  
 - `DELETE /:id` - File deletion by ID
+- `GET /swagger/*` - Swagger UI documentation
 
 ## Configuration
 
@@ -75,7 +82,8 @@ The project has solid foundation but needs core implementation:
 - Database connection setup
 - Request logging middleware
 - Docker containerization
-- Swagger API documentation annotations
+- Swagger UI with interactive API documentation
+- Auto-regenerating docs via go generate
 
 ### ❌ Needs Implementation  
 - Actual file upload/download logic in handlers

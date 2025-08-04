@@ -1,3 +1,5 @@
+//go:generate swag init -g cmd/sefud/main.go
+
 // Package main is the entry point for the sefud file upload/download server.
 //
 // @title sefud API
