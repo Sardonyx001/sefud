@@ -4,32 +4,75 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - SEFUD_APP_PORT=7000
-      - SEFUD_STORAGE_PATH=/uploads
-      - SEFUD_MIME_BLACKLIST=application/x-msdownload,application/x-sh
-      - MAX_CONTENT_LENGTH=10485760
-      - DATABASE_URL=your_database_url
-    volumes:
-      - ./uploads:/uploads
+      - SEFUD_APP_PORT=${SEFUD_APP_PORT:-7000}
+      - SEFUD_STORAGE_PATH=${SEFUD_STORAGE_PATH:-/uploads}
+      - SEFUD_MIME_BLACKLIST=${SEFUD_MIME_BLACKLIST:-application/x-msdownload,application/x-sh}
+      - SEFUD_MAX_UPLOAD_SIZE=${SEFUD_MAX_UPLOAD_SIZE:-104857600}
+      - SEFUD_DB_USER=${SEFUD_DB_USER:-user}
+      - SEFUD_DB_PASSWORD=${SEFUD_DB_PASSWORD:-password}
+      - SEFUD_DB_NAME=${SEFUD_DB_NAME:-sefud}
+      - SEFUD_DB_HOST=postgres
+      - SEFUD_DB_PORT=5432
+      - SEFUD_R2_ACCESS_KEY_ID=${SEFUD_R2_ACCESS_KEY_ID:-minioadmin}
+      - SEFUD_R2_SECRET_ACCESS_KEY=${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123}
+      - SEFUD_R2_BUCKET_NAME=${SEFUD_R2_BUCKET_NAME:-sefud-files}
+      - SEFUD_R2_ENDPOINT=${SEFUD_R2_ENDPOINT:-http://minio:9000}
+      - SEFUD_R2_REGION=${SEFUD_R2_REGION:-us-east-1}
     ports:
-      - "${DOCKER_EXPOSE_APP_PORT}:${APP_PORT}"
+      - "${SEFUD_APP_PORT:-7000}:${SEFUD_APP_PORT:-7000}"
     depends_on:
-      - db
+      - postgres
+      - minio
+
   postgres:
     image: postgres:latest
+    container_name: sefud-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${SEFUD_DB_NAME:-sefud}
+      POSTGRES_USER: ${SEFUD_DB_USER:-user}
+      POSTGRES_PASSWORD: ${SEFUD_DB_PASSWORD:-password}
     ports:
-      - "${DOCKER_EXPOSE_DB_PORT}:${DB_PORT}"
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
+      - "${SEFUD_DB_PORT:-5432}:5432"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SEFUD_DB_USER:-user}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  minio:
+    image: minio/minio:latest
+    container_name: sefud-minio
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${SEFUD_R2_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Create bucket on startup
+  minio-setup:
+    image: minio/mc:latest
     depends_on:
-      - sefud
-      - db
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set minio http://minio:9000 ${SEFUD_R2_ACCESS_KEY_ID:-minioadmin} ${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123};
+      /usr/bin/mc mb minio/${SEFUD_R2_BUCKET_NAME:-sefud-files} --ignore-existing;
+      echo 'MinIO setup complete';
+      "
+
+volumes:
+  postgres_data:
+  minio_data:
