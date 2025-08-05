@@ -27,7 +27,7 @@ func New(cfg *config.Config) (*Server, error) {
 
 	// Initialize database
 	database := db.Init(cfg)
-	
+
 	// Auto-migrate database tables
 	if err := database.AutoMigrate(&models.File{}); err != nil {
 		return nil, err
@@ -46,11 +46,11 @@ func New(cfg *config.Config) (*Server, error) {
 	e.Use(logger.InitLoggerMiddleware())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
-	
+
 	// Security middleware
 	e.Use(middleware.Secure())
 	e.Use(middleware.RequestID())
-	
+
 	// Rate limiting for uploads (adjust as needed)
 	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(20))) // 20 requests per second
 

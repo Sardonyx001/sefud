@@ -27,13 +27,13 @@ import (
 
 // UploadResponse represents the response structure for successful uploads
 type UploadResponse struct {
-	ID          string `json:"id"`
-	OriginalName string `json:"original_name"`
-	Size        int64  `json:"size"`
-	ContentType string `json:"content_type"`
-	URL         string `json:"url"`
-	DeleteToken string `json:"delete_token"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	ID           string     `json:"id"`
+	OriginalName string     `json:"original_name"`
+	Size         int64      `json:"size"`
+	ContentType  string     `json:"content_type"`
+	URL          string     `json:"url"`
+	DeleteToken  string     `json:"delete_token"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
 }
 
 // ErrorResponse represents error response structure
@@ -75,13 +75,13 @@ func NewFileHandler(db *gorm.DB, r2Client *storage.R2Client, cfg *config.Config)
 // @Router /up [post]
 func (h *FileHandler) UploadFile(c echo.Context) error {
 	startTime := time.Now()
-	
+
 	// Parse multipart form with size limit
 	err := c.Request().ParseMultipartForm(h.Config.App.MaxUploadSize)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "Failed to parse multipart form",
-			Code:  "INVALID_MULTIPART",
+			Error:   "Failed to parse multipart form",
+			Code:    "INVALID_MULTIPART",
 			Details: err.Error(),
 		})
 	}
@@ -116,8 +116,8 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	// Check MIME type blacklist
 	if h.isBlacklistedMimeType(contentType) {
 		return c.JSON(http.StatusUnsupportedMediaType, ErrorResponse{
-			Error: "File type not allowed",
-			Code:  "FORBIDDEN_MIME_TYPE",
+			Error:   "File type not allowed",
+			Code:    "FORBIDDEN_MIME_TYPE",
 			Details: contentType,
 		})
 	}
@@ -139,10 +139,10 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	// Create tee readers for concurrent hashing and upload
 	md5Hash := md5.New()
 	sha256Hash := sha256.New()
-	
+
 	// Create a multi-writer that writes to both hash functions
 	hashWriter := io.MultiWriter(md5Hash, sha256Hash)
-	
+
 	// Use TeeReader to hash while reading for upload
 	teeReader := io.TeeReader(file, hashWriter)
 
@@ -158,7 +158,7 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	// Determine if we should use multipart upload
 	uploadOpts.EnableMultipart = fileHeader.Size > 10*1024*1024 // 10MB threshold
 	if uploadOpts.EnableMultipart {
-		uploadOpts.MaxConcurrency = 6 // Higher concurrency for large files
+		uploadOpts.MaxConcurrency = 6          // Higher concurrency for large files
 		uploadOpts.ChunkSize = 8 * 1024 * 1024 // 8MB chunks for optimal performance
 	}
 
@@ -169,8 +169,8 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	err = h.R2Client.Upload(ctx, r2Key, teeReader, uploadOpts)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Failed to upload file to storage",
-			Code:  "STORAGE_ERROR",
+			Error:   "Failed to upload file to storage",
+			Code:    "STORAGE_ERROR",
 			Details: err.Error(),
 		})
 	}
@@ -189,7 +189,7 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 		DeleteToken:    deleteToken,
 		ExpiresAt:      expiresAt,
 		UploadIP:       c.RealIP(),
-		UserAgent:     c.Request().UserAgent(),
+		UserAgent:      c.Request().UserAgent(),
 		MD5Hash:        hex.EncodeToString(md5Hash.Sum(nil)),
 		SHA256Hash:     hex.EncodeToString(sha256Hash.Sum(nil)),
 		UploadDuration: uploadDuration,
@@ -205,8 +205,8 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 		}()
 
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Failed to save file metadata",
-			Code:  "DATABASE_ERROR",
+			Error:   "Failed to save file metadata",
+			Code:    "DATABASE_ERROR",
 			Details: err.Error(),
 		})
 	}
@@ -231,7 +231,7 @@ func (h *FileHandler) isBlacklistedMimeType(contentType string) bool {
 	// Extract base MIME type (remove parameters like charset)
 	baseMimeType := strings.Split(contentType, ";")[0]
 	baseMimeType = strings.TrimSpace(strings.ToLower(baseMimeType))
-	
+
 	return slices.Contains(h.Config.App.MimeBlacklist, baseMimeType)
 }
 

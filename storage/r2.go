@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -27,9 +26,9 @@ type R2Client struct {
 
 // ChunkUploadResult represents the result of a chunk upload
 type ChunkUploadResult struct {
-	ETag     string
+	ETag       string
 	PartNumber int32
-	Error    error
+	Error      error
 }
 
 // UploadOptions configures upload behavior for performance optimization
@@ -123,11 +122,11 @@ func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Re
 	}
 
 	uploadID := createResp.UploadId
-	
+
 	// Setup channels for concurrent chunk processing
 	chunkChan := make(chan []byte, opts.MaxConcurrency)
 	resultChan := make(chan ChunkUploadResult, opts.MaxConcurrency)
-	
+
 	// Start worker goroutines for concurrent uploads
 	var wg sync.WaitGroup
 	for i := 0; i < opts.MaxConcurrency; i++ {
@@ -139,7 +138,7 @@ func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Re
 	go func() {
 		defer close(chunkChan)
 		buffer := make([]byte, opts.ChunkSize)
-		
+
 		for {
 			n, err := reader.Read(buffer)
 			if n > 0 {
@@ -172,7 +171,7 @@ func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Re
 			uploadError = result.Error
 			break
 		}
-		
+
 		completedParts = append(completedParts, types.CompletedPart{
 			ETag:       aws.String(result.ETag),
 			PartNumber: aws.Int32(result.PartNumber),
@@ -202,7 +201,6 @@ func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Re
 			Parts: completedParts,
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -213,12 +211,12 @@ func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Re
 // uploadWorker processes chunks concurrently
 func (r *R2Client) uploadWorker(ctx context.Context, wg *sync.WaitGroup, key string, uploadID *string, chunkChan <-chan []byte, resultChan chan<- ChunkUploadResult) {
 	defer wg.Done()
-	
+
 	partNumber := int32(1)
-	
+
 	for chunk := range chunkChan {
 		result := ChunkUploadResult{PartNumber: partNumber}
-		
+
 		resp, err := r.client.UploadPart(ctx, &s3.UploadPartInput{
 			Bucket:     aws.String(r.bucketName),
 			Key:        aws.String(key),
@@ -226,13 +224,13 @@ func (r *R2Client) uploadWorker(ctx context.Context, wg *sync.WaitGroup, key str
 			UploadId:   uploadID,
 			Body:       bytes.NewReader(chunk),
 		})
-		
+
 		if err != nil {
 			result.Error = err
 		} else {
 			result.ETag = *resp.ETag
 		}
-		
+
 		resultChan <- result
 		partNumber++
 	}
@@ -297,7 +295,7 @@ func DefaultUploadOptions() UploadOptions {
 	return UploadOptions{
 		ContentType:     "application/octet-stream",
 		ChunkSize:       5 * 1024 * 1024, // 5MB chunks
-		MaxConcurrency:  4,                // 4 concurrent uploads
+		MaxConcurrency:  4,               // 4 concurrent uploads
 		EnableMultipart: true,
 		Metadata:        make(map[string]string),
 	}
