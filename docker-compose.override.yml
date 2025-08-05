@@ -1,6 +1,6 @@
 # Docker Compose override for development
 # This file is automatically loaded by docker-compose
-version: '3.8'
+version: "3.8"
 
 services:
   sefud:
@@ -20,10 +20,5 @@ services:
   minio:
     # Expose MinIO for development access
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Console
-
-# Optional: Remove caddy for development (direct access to sefud)
-  caddy:
-    profiles:
-      - production
+      - "9000:9000" # API
+      - "9001:9001" # Console
