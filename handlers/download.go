@@ -31,17 +31,17 @@ import (
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{id} [get]
 func (h *FileHandler) DownloadFile(c echo.Context) error {
-	fileID := c.Param("id")
-	if fileID == "" {
+	publicID := c.Param("id")
+	if publicID == "" {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: "File ID is required",
 			Code:  "MISSING_FILE_ID",
 		})
 	}
 
-	// Retrieve file metadata from database
+	// Retrieve file metadata from database using short_id
 	var fileRecord models.File
-	err := h.DB.Where("id = ?", fileID).First(&fileRecord).Error
+	err := h.DB.Where("short_id = ?", publicID).First(&fileRecord).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return c.JSON(http.StatusNotFound, ErrorResponse{
@@ -106,7 +106,7 @@ func (h *FileHandler) DownloadFile(c echo.Context) error {
 	_, err = io.Copy(c.Response().Writer, reader)
 	if err != nil {
 		// Log error but don't return JSON since we've already started streaming
-		c.Logger().Errorf("Error streaming file %s: %v", fileID, err)
+		c.Logger().Errorf("Error streaming file %s: %v", publicID, err)
 		return err
 	}
 
@@ -136,10 +136,7 @@ func (h *FileHandler) handleRangeRequest(ctx context.Context, fileRecord *models
 		if err != nil {
 			return nil, 0, http.StatusBadRequest, err
 		}
-		start = fileRecord.Size - suffix
-		if start < 0 {
-			start = 0
-		}
+		start = max(0, fileRecord.Size-suffix)
 		end = fileRecord.Size - 1
 	} else {
 		// Start range: bytes=0-499 or bytes=500-

@@ -35,13 +35,14 @@ type DeleteResponse struct {
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{id} [delete]
 func (h *FileHandler) DeleteFile(c echo.Context) error {
-	fileID := c.Param("id")
-	if fileID == "" {
+	publicID := c.Param("id")
+	if publicID == "" {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: "File ID is required",
 			Code:  "MISSING_FILE_ID",
 		})
 	}
+
 
 	// Get delete token from query parameter or header
 	deleteToken := c.QueryParam("token")
@@ -64,9 +65,9 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 		}
 	}()
 
-	// Retrieve and lock the file record
+	// Retrieve and lock the file record using short_id
 	var fileRecord models.File
-	err := tx.Where("id = ? AND delete_token = ?", fileID, deleteToken).First(&fileRecord).Error
+	err := tx.Where("short_id = ? AND delete_token = ?", publicID, deleteToken).First(&fileRecord).Error
 	if err != nil {
 		tx.Rollback()
 		if err == gorm.ErrRecordNotFound {
@@ -122,18 +123,18 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 			// Log the error for monitoring/cleanup processes
 			// In production, you might want to queue this for retry
 			// or store failed deletions for manual cleanup
-			c.Logger().Errorf("Failed to delete file %s from R2 storage: %v", fileID, err)
+			c.Logger().Errorf("Failed to delete file %s from R2 storage: %v", publicID, err)
 
 			// Optionally, you could store failed deletions in a cleanup queue
 			// h.enqueueCleanupTask(fileRecord.R2Key, fileRecord.ID)
 		} else {
-			c.Logger().Infof("Successfully deleted file %s from R2 storage", fileID)
+			c.Logger().Infof("Successfully deleted file %s from R2 storage", publicID)
 		}
 	}()
 
 	// Return success response immediately
 	response := DeleteResponse{
-		ID:        fileID,
+		ID:        publicID,
 		Message:   "File deleted successfully",
 		DeletedAt: now,
 	}
@@ -170,17 +171,18 @@ func (h *FileHandler) CleanupExpiredFiles(ctx context.Context) error {
 // GetFileInfo returns file metadata without downloading the file
 // This is useful for checking file existence and properties
 func (h *FileHandler) GetFileInfo(c echo.Context) error {
-	fileID := c.Param("id")
-	if fileID == "" {
+	publicID := c.Param("id")
+	if publicID == "" {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: "File ID is required",
 			Code:  "MISSING_FILE_ID",
 		})
 	}
 
-	// Retrieve file metadata from database
+
+	// Retrieve file metadata from database using short_id
 	var fileRecord models.File
-	err := h.DB.Where("id = ?", fileID).First(&fileRecord).Error
+	err := h.DB.Where("short_id = ?", publicID).First(&fileRecord).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return c.JSON(http.StatusNotFound, ErrorResponse{
@@ -211,9 +213,9 @@ func (h *FileHandler) GetFileInfo(c echo.Context) error {
 		})
 	}
 
-	// Return file metadata (excluding sensitive fields)
-	response := map[string]interface{}{
-		"id":            fileRecord.ID,
+	// Return file metadata (excluding sensitive fields) with public ID
+	response := map[string]any{
+		"id":            publicID,
 		"original_name": fileRecord.OriginalName,
 		"content_type":  fileRecord.ContentType,
 		"size":          fileRecord.Size,
