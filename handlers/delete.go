@@ -14,8 +14,8 @@ import (
 
 // DeleteResponse represents the response structure for successful deletions
 type DeleteResponse struct {
-	ID      string `json:"id"`
-	Message string `json:"message"`
+	ID        string    `json:"id"`
+	Message   string    `json:"message"`
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
@@ -48,7 +48,7 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 	if deleteToken == "" {
 		deleteToken = c.Request().Header.Get("X-Delete-Token")
 	}
-	
+
 	if deleteToken == "" {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: "Delete token is required",
@@ -76,8 +76,8 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Database error",
-			Code:  "DATABASE_ERROR",
+			Error:   "Database error",
+			Code:    "DATABASE_ERROR",
 			Details: err.Error(),
 		})
 	}
@@ -97,8 +97,8 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 	if err != nil {
 		tx.Rollback()
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Failed to mark file as deleted",
-			Code:  "DATABASE_UPDATE_ERROR",
+			Error:   "Failed to mark file as deleted",
+			Code:    "DATABASE_UPDATE_ERROR",
 			Details: err.Error(),
 		})
 	}
@@ -106,8 +106,8 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 	// Commit the database transaction first
 	if err := tx.Commit().Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Failed to commit deletion",
-			Code:  "DATABASE_COMMIT_ERROR",
+			Error:   "Failed to commit deletion",
+			Code:    "DATABASE_COMMIT_ERROR",
 			Details: err.Error(),
 		})
 	}
@@ -123,7 +123,7 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 			// In production, you might want to queue this for retry
 			// or store failed deletions for manual cleanup
 			c.Logger().Errorf("Failed to delete file %s from R2 storage: %v", fileID, err)
-			
+
 			// Optionally, you could store failed deletions in a cleanup queue
 			// h.enqueueCleanupTask(fileRecord.R2Key, fileRecord.ID)
 		} else {
@@ -133,8 +133,8 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 
 	// Return success response immediately
 	response := DeleteResponse{
-		ID:      fileID,
-		Message: "File deleted successfully",
+		ID:        fileID,
+		Message:   "File deleted successfully",
 		DeletedAt: now,
 	}
 
@@ -189,8 +189,8 @@ func (h *FileHandler) GetFileInfo(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "Database error",
-			Code:  "DATABASE_ERROR",
+			Error:   "Database error",
+			Code:    "DATABASE_ERROR",
 			Details: err.Error(),
 		})
 	}

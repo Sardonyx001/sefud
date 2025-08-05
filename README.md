@@ -5,6 +5,7 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 ## 🚀 Features
 
 ### ✅ **Production Ready**
+
 - **High-Performance Uploads**: Concurrent chunked processing with 6-worker pools for 100MB+ files
 - **Streaming Downloads**: Memory-efficient direct streaming with HTTP range request support
 - **Cloudflare R2 Storage**: S3-compatible object storage with global edge performance
@@ -13,6 +14,7 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 - **API Documentation**: Interactive Swagger UI with complete endpoint documentation
 
 ### ⚡ **Performance Features**
+
 - **Concurrent Uploads**: Configurable chunk size (8MB) and worker pools
 - **Streaming Operations**: Direct streaming prevents memory bloat
 - **Range Requests**: Full HTTP range support for partial downloads and resumable transfers
@@ -21,6 +23,7 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 - **Connection Pooling**: Optimized database and storage connections
 
 ### 🔒 **Security & Reliability**
+
 - **Token-based Deletion**: Secure file deletion with unique authorization tokens
 - **File Expiration**: Configurable TTL with automatic cleanup
 - **MIME Validation**: Configurable blacklist for dangerous file types
@@ -31,6 +34,7 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 ## 🛠 Setup & Installation
 
 ### Prerequisites
+
 - Go 1.23.0+
 - PostgreSQL database
 - Cloudflare R2 bucket and credentials
@@ -38,25 +42,29 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 ### Quick Start
 
 1. **Clone and setup**:
+
 ```bash
 git clone https://github.com/Sardonyx001/sefud.git
 cd sefud
 go mod download
 ```
 
-2. **Configure environment**:
+1. **Configure environment**:
+
 ```bash
 cp .env.example .env
 # Edit .env with your R2 and database credentials
 ```
 
-3. **Start dependencies**:
+1. **Start dependencies**:
+
 ```bash
 # PostgreSQL with Podman/Docker
 podman run --name sefud-postgres -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=sefud -p 5432:5432 -d postgres:latest
 ```
 
-4. **Run the service**:
+1. **Run the service**:
+
 ```bash
 # Development with live reload
 air --build.cmd "go build -o tmp/sefud cmd/sefud/main.go" --build.bin "tmp/sefud"
@@ -66,8 +74,8 @@ go build -o sefud ./cmd/sefud
 ./sefud
 ```
 
-5. **Access the API**:
-   - **Swagger UI**: http://localhost:7000/swagger/index.html
+1. **Access the API**:
+   - **Swagger UI**: <http://localhost:7000/swagger/index.html>
    - **Upload**: `POST http://localhost:7000/up`
    - **Download**: `GET http://localhost:7000/{file-id}`
    - **Delete**: `DELETE http://localhost:7000/{file-id}?token={delete-token}`
@@ -75,6 +83,7 @@ go build -o sefud ./cmd/sefud
 ## 📖 API Usage
 
 ### Upload a File
+
 ```bash
 curl -X POST -F "file=@example.pdf" \
   -F "expires=24h" \
@@ -82,6 +91,7 @@ curl -X POST -F "file=@example.pdf" \
 ```
 
 **Response**:
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -95,22 +105,25 @@ curl -X POST -F "file=@example.pdf" \
 ```
 
 ### Download a File
+
 ```bash
 curl -O http://localhost:7000/550e8400-e29b-41d4-a716-446655440000
 ```
 
 ### Delete a File
+
 ```bash
 curl -X DELETE "http://localhost:7000/550e8400-e29b-41d4-a716-446655440000?token=a1b2c3d4e5f6..."
 ```
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Environment Variables (`.env`) Example
+
 ```bash
 # Application
 SEFUD_APP_PORT=7000
-SEFUD_MAX_UPLOAD_SIZE=104857600  # 100MB
+SEFUD_MAX_UPLOAD_SIZE=104857600  # 1024 * 1024 = 100MB
 SEFUD_MIME_BLACKLIST=application/x-sh,application/x-executable
 
 # Database
@@ -130,7 +143,7 @@ SEFUD_R2_REGION=auto
 
 ## 🏗 Architecture
 
-```
+```plain
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
 │   Client    │    │    sefud     │    │ Cloudflare  │
 │             │◄──►│   (Go API)   │◄──►│     R2      │
@@ -145,7 +158,8 @@ SEFUD_R2_REGION=auto
 ```
 
 ### Project Structure
-```
+
+```plain
 sefud/
 ├── cmd/sefud/           # Application entry point
 ├── server/              # HTTP server and middleware
@@ -161,17 +175,20 @@ sefud/
 ## 🔧 Development
 
 ### Generate Swagger Docs
+
 ```bash
 go generate ./...
 # or manually: swag init -g cmd/sefud/main.go
 ```
 
 ### Docker Development
+
 ```bash
 docker-compose up  # Starts sefud + postgres + caddy
 ```
 
 ### Performance Tuning
+
 - **Chunk Size**: Adjust `storage.DefaultUploadOptions().ChunkSize` for your use case
 - **Concurrency**: Modify `MaxConcurrency` based on available resources
 - **Database**: Tune PostgreSQL connection pool settings
@@ -187,6 +204,7 @@ docker-compose up  # Starts sefud + postgres + caddy
 ## 🚧 Roadmap
 
 ### Completed ✅
+
 - [x] High-performance file upload/download/delete
 - [x] Cloudflare R2 integration
 - [x] PostgreSQL metadata storage
@@ -197,6 +215,7 @@ docker-compose up  # Starts sefud + postgres + caddy
 - [x] Docker containerization
 
 ### Planned 🎯
+
 - [ ] File encryption/decryption
 - [ ] Background cleanup jobs
 - [ ] File deduplication
