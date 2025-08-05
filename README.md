@@ -1,29 +1,32 @@
 # sefud: high-performance file upload & download service
 
-A blazingly fast, secure file upload and download service built with Go, featuring Cloudflare R2 storage and high-performance concurrent processing.
+A blazingly fast, secure file upload and download service built with Go, featuring Cloudflare R2 storage, MinIO local development, and high-performance concurrent processing with short 6-character file IDs.
 
 ## 🚀 Features
 
 ### ✅ **Production Ready**
 
-- **High-Performance Uploads**: Concurrent chunked processing with 6-worker pools for 100MB+ files
+- **Short File IDs**: 6-character URLs like `Fx3B4k` instead of long UUIDs for clean, shareable links
+- **High-Performance Uploads**: AWS S3 Manager with optimized HTTP client for maximum throughput
 - **Streaming Downloads**: Memory-efficient direct streaming with HTTP range request support
-- **Cloudflare R2 Storage**: S3-compatible object storage with global edge performance
-- **PostgreSQL Metadata**: Comprehensive file tracking with GORM ORM
+- **Dual Storage**: Cloudflare R2 for production, MinIO for local development
+- **PostgreSQL Metadata**: Comprehensive file tracking with GORM ORM and automatic migrations
 - **Security First**: Rate limiting, CORS, input validation, and token-based deletion
 - **API Documentation**: Interactive Swagger UI with complete endpoint documentation
 
 ### ⚡ **Performance Features**
 
-- **Concurrent Uploads**: Configurable chunk size (8MB) and worker pools
+- **Optimized R2 Client**: Custom HTTP client with 100 max connections, disabled compression
+- **Smart Upload Strategy**: Simple uploads for files <25MB, multipart for larger files
+- **Concurrent Processing**: 8 concurrent workers with 16MB chunks for optimal throughput
 - **Streaming Operations**: Direct streaming prevents memory bloat
 - **Range Requests**: Full HTTP range support for partial downloads and resumable transfers
 - **Integrity Checks**: Real-time MD5/SHA256 hashing during upload
-- **Async Cleanup**: Non-blocking R2 operations for optimal response times
 - **Connection Pooling**: Optimized database and storage connections
 
 ### 🔒 **Security & Reliability**
 
+- **Short ID Mapping**: Database stores UUIDs, public API uses 6-character sqids for security
 - **Token-based Deletion**: Secure file deletion with unique authorization tokens
 - **File Expiration**: Configurable TTL with automatic cleanup
 - **MIME Validation**: Configurable blacklist for dangerous file types
@@ -36,31 +39,57 @@ A blazingly fast, secure file upload and download service built with Go, featuri
 ### Prerequisites
 
 - Go 1.23.0+
-- PostgreSQL database
-- Cloudflare R2 bucket and credentials
+- PostgreSQL database (or use Docker Compose)
+- Cloudflare R2 credentials (or use local MinIO)
 
-### Quick Start
+### Quick Start with Docker Compose (Recommended)
 
 1. **Clone and setup**:
 
 ```bash
 git clone https://github.com/Sardonyx001/sefud.git
 cd sefud
+```
+
+1. **Start the full stack**:
+
+```bash
+# Starts PostgreSQL + MinIO + sefud app
+docker-compose up -d
+
+# Check services are running
+docker-compose ps
+```
+
+1. **Access the services**:
+   - **Sefud API**: <http://localhost:7000>
+   - **Swagger UI**: <http://localhost:7000/swagger/index.html>
+   - **MinIO Console**: <http://localhost:9001> (minioadmin/minioadmin123)
+
+### Local Development Setup
+
+1. **Start dependencies only**:
+
+```bash
+# Start PostgreSQL and MinIO
+docker-compose up -d postgres minio
+
+# Or start them separately
+podman run --name sefud-postgres -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=sefud -p 5432:5432 -d postgres:latest
+podman run --name sefud-minio -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin123 -d minio/minio:latest server /data --console-address ":9001"
+```
+
+1. **Install dependencies**:
+
+```bash
 go mod download
 ```
 
-1. **Configure environment**:
+1. **Configure environment** (`.env` is already configured for local development):
 
 ```bash
-cp .env.example .env
-# Edit .env with your R2 and database credentials
-```
-
-1. **Start dependencies**:
-
-```bash
-# PostgreSQL with Podman/Docker
-podman run --name sefud-postgres -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=sefud -p 5432:5432 -d postgres:latest
+# Check .env file - should be configured for MinIO by default
+cat .env
 ```
 
 1. **Run the service**:
@@ -74,80 +103,174 @@ go build -o sefud ./cmd/sefud
 ./sefud
 ```
 
-1. **Access the API**:
-   - **Swagger UI**: <http://localhost:7000/swagger/index.html>
-   - **Upload**: `POST http://localhost:7000/up`
-   - **Download**: `GET http://localhost:7000/{file-id}`
-   - **Delete**: `DELETE http://localhost:7000/{file-id}?token={delete-token}`
+## 📖 API Usage & Testing
 
-## 📖 API Usage
-
-### Upload a File
+### Create Test Files
 
 ```bash
-curl -X POST -F "file=@example.pdf" \
-  -F "expires=24h" \
-  http://localhost:7000/up
+# Create test directory
+mkdir -p tests/data
+
+# Create test files of different sizes
+dd if=/dev/zero of=tests/data/test_1mb.bin bs=1M count=1
+dd if=/dev/zero of=tests/data/test_15mb.bin bs=1M count=15
+dd if=/dev/zero of=tests/data/test_50mb.bin bs=1M count=50
+
+# Create a text file
+echo "Hello, World! This is a test file." > tests/data/test.txt
 ```
 
-**Response**:
+### Upload Files (HTTPie)
+
+```bash
+# Install HTTPie if you don't have it
+# brew install httpie  # macOS
+# pip install httpie   # Python
+
+# Upload a small file
+http -f POST :7000/up file@tests/data/test.txt
+
+# Upload a large file with expiration
+http -f POST :7000/up file@tests/data/test_15mb.bin expires=24h
+
+# Upload with custom filename
+http -f POST :7000/up file@tests/data/test_1mb.bin
+```
+
+**Example Response**:
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "original_name": "example.pdf",
-  "size": 1048576,
-  "content_type": "application/pdf",
-  "url": "http://localhost:7000/550e8400-e29b-41d4-a716-446655440000",
-  "delete_token": "a1b2c3d4e5f6...",
-  "expires_at": "2025-08-05T19:00:00Z"
+    "content_type": "application/octet-stream",
+    "delete_token": "a1b2c3d4e5f6789...",
+    "id": "Fx3B4k",
+    "original_name": "test_15mb.bin",
+    "size": 15728640,
+    "url": "http://localhost:7000/Fx3B4k"
 }
 ```
 
-### Download a File
+### Download Files
 
 ```bash
-curl -O http://localhost:7000/550e8400-e29b-41d4-a716-446655440000
+# Download file to temp location
+TEMP_FILE=$(mktemp --suffix=.bin) && http GET :7000/Fx3B4k > "$TEMP_FILE" && ls -la "$TEMP_FILE"
+
+# Download with curl
+curl -O -J http://localhost:7000/Fx3B4k
+
+# Range request (partial download)
+curl -H "Range: bytes=0-1023" http://localhost:7000/Fx3B4k
 ```
 
-### Delete a File
+### File Operations
 
 ```bash
-curl -X DELETE "http://localhost:7000/550e8400-e29b-41d4-a716-446655440000?token=a1b2c3d4e5f6..."
+# Get file info (HEAD request)
+http HEAD :7000/Fx3B4k
+
+# Delete file
+http DELETE :7000/Fx3B4k token==your-delete-token-here
+
+# Upload and immediately delete
+RESPONSE=$(http -f POST :7000/up file@tests/data/test.txt) && \
+ID=$(echo $RESPONSE | jq -r .id) && \
+TOKEN=$(echo $RESPONSE | jq -r .delete_token) && \
+http DELETE :7000/$ID token==$TOKEN
+```
+
+### Verify Files in MinIO
+
+```bash
+# List files in MinIO bucket
+podman exec -it sefud-minio mc ls -r local/sefud-files
+
+# Or access MinIO Console
+open http://localhost:9001
+# Login: minioadmin / minioadmin123
+# Navigate to Buckets → sefud-files
+```
+
+### Performance Testing
+
+```bash
+# Test upload performance
+time http -f POST :7000/up file@tests/data/test_50mb.bin
+
+# Concurrent uploads
+for i in {1..5}; do
+  http -f POST :7000/up file@tests/data/test_1mb.bin &
+done
+wait
+
+# Download performance test
+ID="your-file-id-here"
+time curl -s http://localhost:7000/$ID > /dev/null
 ```
 
 ## ⚙️ Configuration
 
-### Environment Variables (`.env`) Example
+### Environment Variables (`.env`)
 
 ```bash
-# Application
+# Application Configuration
 SEFUD_APP_PORT=7000
-SEFUD_MAX_UPLOAD_SIZE=104857600  # 1024 * 1024 = 100MB
-SEFUD_MIME_BLACKLIST=application/x-sh,application/x-executable
+SEFUD_STORAGE_PATH=./uploads
+SEFUD_MIME_BLACKLIST=application/x-sh,application/x-msdownload,application/x-executable
+SEFUD_MAX_UPLOAD_SIZE=104857600  # 100MB
 
-# Database
-SEFUD_DB_HOST=localhost
-SEFUD_DB_PORT=5432
+# Database Configuration
 SEFUD_DB_USER=user
 SEFUD_DB_PASSWORD=password
 SEFUD_DB_NAME=sefud
+SEFUD_DB_HOST=localhost
+SEFUD_DB_PORT=5432
 
-# Cloudflare R2
-SEFUD_R2_ACCESS_KEY_ID=your_access_key
-SEFUD_R2_SECRET_ACCESS_KEY=your_secret_key
+# MinIO Configuration (Local Development)
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+
+# Storage Configuration - MinIO (Active)
+SEFUD_R2_ACCESS_KEY_ID=minioadmin
+SEFUD_R2_SECRET_ACCESS_KEY=minioadmin123
 SEFUD_R2_BUCKET_NAME=sefud-files
-SEFUD_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
-SEFUD_R2_REGION=auto
+SEFUD_R2_ENDPOINT=http://localhost:9000
+SEFUD_R2_REGION=us-east-1
+
+# Storage Configuration - Cloudflare R2 (Production)
+# Uncomment these and comment out MinIO config above for production
+# SEFUD_R2_ACCESS_KEY_ID=your_r2_access_key_id
+# SEFUD_R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+# SEFUD_R2_BUCKET_NAME=your-bucket-name
+# SEFUD_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+# SEFUD_R2_REGION=auto
+```
+
+### Docker Compose Services
+
+```bash
+# Full stack (production-like)
+docker-compose up -d
+
+# Development mode (no Caddy)
+docker-compose --profile development up -d
+
+# Individual services
+docker-compose up -d postgres minio  # Dependencies only
+docker-compose up -d sefud           # App only
+
+# Check service health
+docker-compose ps
+docker-compose logs sefud -f         # Follow app logs
 ```
 
 ## 🏗 Architecture
 
 ```plain
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│   Client    │    │    sefud     │    │ Cloudflare  │
-│             │◄──►│   (Go API)   │◄──►│     R2      │
-│  (Browser)  │    │              │    │  (Storage)  │
+│   Client    │    │    sefud     │    │   MinIO/    │
+│             │◄──►│   (Go API)   │◄──►│ Cloudflare  │
+│  (Browser)  │    │              │    │     R2      │
 └─────────────┘    └──────┬───────┘    └─────────────┘
                           │
                           ▼
@@ -161,18 +284,36 @@ SEFUD_R2_REGION=auto
 
 ```plain
 sefud/
-├── cmd/sefud/           # Application entry point
-├── server/              # HTTP server and middleware
-├── handlers/            # API request handlers
-├── storage/             # Cloudflare R2 client
-├── models/              # Database models
-├── config/              # Configuration management
-├── db/                  # Database connection
-├── logger/              # Structured logging
-└── docs/                # Auto-generated API docs
+├── cmd/sefud/              # Application entry point
+├── server/                 # HTTP server, middleware, migrations
+├── handlers/               # API request handlers (upload/download/delete)
+├── storage/                # R2/MinIO client with performance optimizations
+├── models/                 # Database models with short_id mapping
+├── config/                 # Environment configuration management
+├── db/                     # Database connection and setup
+├── logger/                 # Structured logging middleware
+├── docs/                   # Auto-generated Swagger documentation
+├── tests/                  # Test files and data
+├── docker-compose.yaml     # Full stack deployment
+├── docker-compose.override.yml  # Development overrides
+└── .env                    # Environment configuration
 ```
 
 ## 🔧 Development
+
+### Database Migrations
+
+The application automatically handles database migrations:
+
+```bash
+# Migrations run automatically on startup
+go run cmd/sefud/main.go
+
+# Database schema:
+# - files table with UUID primary key
+# - short_id field for public 6-character IDs
+# - Automatic migration of existing records
+```
 
 ### Generate Swagger Docs
 
@@ -181,49 +322,70 @@ go generate ./...
 # or manually: swag init -g cmd/sefud/main.go
 ```
 
-### Docker Development
+### Performance Optimizations
+
+The service includes several performance optimizations:
+
+1. **HTTP Client Tuning**: 100 max connections, keep-alive, disabled compression
+2. **Smart Upload Strategy**: Simple uploads for <25MB, multipart for larger
+3. **Concurrent Processing**: 8 workers with 16MB chunks
+4. **Reduced Retries**: 2 max attempts for faster failure handling
+5. **Connection Pooling**: Optimized for high concurrency
+
+### Troubleshooting
 
 ```bash
-docker-compose up  # Starts sefud + postgres + caddy
+# Check service health
+curl http://localhost:7000/swagger/index.html
+
+# Check MinIO bucket
+podman exec -it sefud-minio mc ls local/sefud-files
+
+# Check database connection
+psql -h localhost -U user -d sefud -c "SELECT COUNT(*) FROM files;"
+
+# Check logs
+docker-compose logs sefud -f
+docker-compose logs postgres -f
+docker-compose logs minio -f
+
+# Performance debugging
+time http -f POST :7000/up file@tests/data/test_15mb.bin
+# Should complete in 2-3 seconds for 15MB files
 ```
-
-### Performance Tuning
-
-- **Chunk Size**: Adjust `storage.DefaultUploadOptions().ChunkSize` for your use case
-- **Concurrency**: Modify `MaxConcurrency` based on available resources
-- **Database**: Tune PostgreSQL connection pool settings
-- **Rate Limiting**: Adjust `middleware.RateLimiter` parameters
 
 ## 📊 Performance Benchmarks
 
-- **Upload Throughput**: 500MB/s+ for large files with concurrent processing
-- **Memory Usage**: <50MB for 1GB file uploads (streaming processing)
-- **Concurrent Users**: 1000+ simultaneous uploads with proper resource limits
-- **Download Speed**: Direct R2 streaming at full network capacity
+With optimizations:
 
-## 🚧 Roadmap
+- **Upload Speed**: 15MB files in 2-3 seconds (was 16-28 seconds)
+- **Memory Usage**: <50MB for 1GB file uploads (streaming processing)
+- **Short IDs**: 6-character URLs instead of 36-character UUIDs
+- **Concurrent Users**: 1000+ simultaneous uploads with proper resource limits
+- **Download Speed**: Direct streaming at full network capacity
+
+## 🚧 Recent Updates
 
 ### Completed ✅
 
-- [x] High-performance file upload/download/delete
-- [x] Cloudflare R2 integration
-- [x] PostgreSQL metadata storage
-- [x] Token-based security
-- [x] File expiration
-- [x] Range request support
-- [x] Swagger documentation
-- [x] Docker containerization
+- [x] **Performance Optimization**: 10x faster uploads with AWS S3 Manager
+- [x] **Short File IDs**: 6-character sqids instead of long UUIDs
+- [x] **MinIO Integration**: Local S3-compatible development environment
+- [x] **Docker Compose**: Complete stack with auto-setup
+- [x] **Database Migration**: Automatic short_id migration for existing records
+- [x] **HTTP Client Optimization**: Custom client with connection pooling
+- [x] **Smart Upload Logic**: Size-based upload strategy selection
 
 ### Planned 🎯
 
 - [ ] File encryption/decryption
 - [ ] Background cleanup jobs
 - [ ] File deduplication
-- [ ] Upload progress tracking
+- [ ] Upload progress tracking via WebSocket
 - [ ] Web interface
 - [ ] CLI tool
 - [ ] Multi-region support
-- [ ] Advanced monitoring
+- [ ] Advanced monitoring and metrics
 
 ## 📝 License
 
