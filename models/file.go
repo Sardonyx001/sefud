@@ -12,6 +12,9 @@ type File struct {
 	// Primary key - UUID as string
 	ID string `gorm:"type:uuid;primary_key" json:"id"`
 
+	// Short public ID for URLs (6 characters)
+	ShortID string `gorm:"size:6;unique" json:"short_id"`
+
 	// File metadata
 	OriginalName string `gorm:"not null" json:"original_name"`
 	ContentType  string `gorm:"not null" json:"content_type"`
