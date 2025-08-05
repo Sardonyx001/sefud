@@ -54,14 +54,14 @@ func New(cfg *config.Config) (*Server, error) {
 	// Rate limiting for uploads (adjust as needed)
 	e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(20))) // 20 requests per second
 
-	// Swagger documentation route
-	e.GET("/swagger/*", echoSwagger.WrapHandler)
-
 	// API Routes with the file handler methods
 	e.POST("/up", fileHandler.UploadFile)
 	e.GET("/:id", fileHandler.DownloadFile)
 	e.DELETE("/:id", fileHandler.DeleteFile)
 	e.HEAD("/:id", fileHandler.GetFileInfo) // For checking file existence
+
+	// Swagger documentation route
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	return &Server{
 		echo:        e,
