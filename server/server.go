@@ -2,6 +2,9 @@
 package server
 
 import (
+	"fmt"
+	"math/rand/v2"
+
 	"github.com/Sardonyx001/sefud/config"
 	"github.com/Sardonyx001/sefud/db"
 	"github.com/Sardonyx001/sefud/handlers"
@@ -10,6 +13,7 @@ import (
 	"github.com/Sardonyx001/sefud/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/sqids/sqids-go"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"gorm.io/gorm"
 )
@@ -31,6 +35,11 @@ func New(cfg *config.Config) (*Server, error) {
 	// Auto-migrate database tables
 	if err := database.AutoMigrate(&models.File{}); err != nil {
 		return nil, err
+	}
+
+	// Migrate existing records to have short_id
+	if err := migrateShortIDs(database); err != nil {
+		return nil, fmt.Errorf("failed to migrate short IDs: %w", err)
 	}
 
 	// Initialize R2 client
@@ -74,4 +83,48 @@ func New(cfg *config.Config) (*Server, error) {
 
 func (s *Server) Start(addr string) error {
 	return s.echo.Start(":" + addr)
+}
+
+// migrateShortIDs generates short_id for existing records that don't have one
+func migrateShortIDs(db *gorm.DB) error {
+	// Create sqids instance with same config as handlers
+	s, _ := sqids.New(sqids.Options{
+		MinLength: 6,
+		Alphabet:  "FxnXM1kBN6cuhsAvjW3Co7l2RePyY8DwaU04Tzt9fHQrqSVKdpimLGIJOgb5ZE",
+	})
+
+	// Find records without short_id
+	var files []models.File
+	if err := db.Where("short_id = '' OR short_id IS NULL").Find(&files).Error; err != nil {
+		return err
+	}
+
+	// Generate short_id for each record
+	for _, file := range files {
+		var shortID string
+		for {
+			// Generate short ID
+			randomNum := uint64(rand.Uint64() % 56_800_000_000)
+			shortID, _ = s.Encode([]uint64{randomNum})
+			// Ensure exactly 6 chars
+			for len(shortID) < 6 {
+				shortID = "F" + shortID
+			}
+			shortID = shortID[:6]
+
+			// Check uniqueness
+			var existing models.File
+			err := db.Where("short_id = ?", shortID).First(&existing).Error
+			if err == gorm.ErrRecordNotFound {
+				break // Unique ID found
+			}
+		}
+
+		// Update the record
+		if err := db.Model(&file).Update("short_id", shortID).Error; err != nil {
+			return fmt.Errorf("failed to update short_id for file %s: %w", file.ID, err)
+		}
+	}
+
+	return nil
 }
