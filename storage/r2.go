@@ -2,17 +2,20 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	sefudConfig "github.com/Sardonyx001/sefud/config"
 )
@@ -20,16 +23,11 @@ import (
 // R2Client provides high-performance R2 storage operations
 type R2Client struct {
 	client     *s3.Client
+	uploader   *manager.Uploader
 	bucketName string
 	mu         sync.RWMutex
 }
 
-// ChunkUploadResult represents the result of a chunk upload
-type ChunkUploadResult struct {
-	ETag       string
-	PartNumber int32
-	Error      error
-}
 
 // UploadOptions configures upload behavior for performance optimization
 type UploadOptions struct {
@@ -42,7 +40,25 @@ type UploadOptions struct {
 
 // NewR2Client creates a new high-performance R2 client
 func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
-	// Create AWS config for Cloudflare R2
+	// Create optimized HTTP client for R2
+	httpClient := &http.Client{
+		Timeout: 10 * time.Minute,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			MaxConnsPerHost:     100,
+			IdleConnTimeout:     90 * time.Second,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			DisableCompression:    true, // Disable compression for better upload performance
+		},
+	}
+
+	// Create AWS config for Cloudflare R2 with optimizations
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			cfg.R2.AccessKeyID,
@@ -50,6 +66,10 @@ func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
 			"",
 		)),
 		config.WithRegion(cfg.R2.Region),
+		config.WithHTTPClient(httpClient),
+		config.WithRetryer(func() aws.Retryer {
+			return retry.AddWithMaxAttempts(retry.NewStandard(), 2) // Reduce retries for speed
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -61,8 +81,16 @@ func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
 		o.UsePathStyle = true // Required for R2
 	})
 
+	// Create uploader with disabled checksums for R2 performance
+	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
+		u.PartSize = 16 * 1024 * 1024 // 16MB parts
+		u.Concurrency = 8             // 8 concurrent uploads
+		u.LeavePartsOnError = false   // Clean up failed uploads
+	})
+
 	return &R2Client{
 		client:     client,
+		uploader:   uploader,
 		bucketName: cfg.R2.BucketName,
 	}, nil
 }
@@ -72,13 +100,13 @@ func (r *R2Client) Upload(ctx context.Context, key string, reader io.Reader, opt
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// For small files or when multipart is disabled, use simple upload
+	// For small files, use simple upload
 	if !opts.EnableMultipart {
 		return r.simpleUpload(ctx, key, reader, opts)
 	}
 
-	// Use multipart upload for large files
-	return r.multipartUpload(ctx, key, reader, opts)
+	// Use S3 manager for multipart uploads (optimized for R2)
+	return r.managerUpload(ctx, key, reader, opts)
 }
 
 // simpleUpload performs a direct upload for smaller files
@@ -103,137 +131,26 @@ func (r *R2Client) simpleUpload(ctx context.Context, key string, reader io.Reade
 	return nil
 }
 
-// multipartUpload performs chunked upload for large files with high concurrency
-func (r *R2Client) multipartUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
-	// Create multipart upload
-	createInput := &s3.CreateMultipartUploadInput{
+// managerUpload uses AWS S3 manager for optimized R2 uploads
+func (r *R2Client) managerUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
+	input := &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucketName),
 		Key:         aws.String(key),
+		Body:        reader,
 		ContentType: aws.String(opts.ContentType),
 	}
 
+	// Add metadata if provided
 	if len(opts.Metadata) > 0 {
-		createInput.Metadata = opts.Metadata
+		input.Metadata = opts.Metadata
 	}
 
-	createResp, err := r.client.CreateMultipartUpload(ctx, createInput)
+	_, err := r.uploader.Upload(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to create multipart upload: %w", err)
-	}
-
-	uploadID := createResp.UploadId
-
-	// Setup channels for concurrent chunk processing
-	chunkChan := make(chan []byte, opts.MaxConcurrency)
-	resultChan := make(chan ChunkUploadResult, opts.MaxConcurrency)
-
-	// Start worker goroutines for concurrent uploads
-	var wg sync.WaitGroup
-	for i := 0; i < opts.MaxConcurrency; i++ {
-		wg.Add(1)
-		go r.uploadWorker(ctx, &wg, key, uploadID, chunkChan, resultChan)
-	}
-
-	// Read and send chunks
-	go func() {
-		defer close(chunkChan)
-		buffer := make([]byte, opts.ChunkSize)
-
-		for {
-			n, err := reader.Read(buffer)
-			if n > 0 {
-				chunk := make([]byte, n)
-				copy(chunk, buffer[:n])
-				chunkChan <- chunk
-			}
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				// Handle read error - for now just log and break
-				break
-			}
-		}
-	}()
-
-	// Close result channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// Collect results
-	var completedParts []types.CompletedPart
-	var uploadError error
-
-	for result := range resultChan {
-		if result.Error != nil {
-			uploadError = result.Error
-			break
-		}
-
-		completedParts = append(completedParts, types.CompletedPart{
-			ETag:       aws.String(result.ETag),
-			PartNumber: aws.Int32(result.PartNumber),
-		})
-	}
-
-	// Handle upload completion or abortion
-	if uploadError != nil {
-		// Abort multipart upload on error
-		_, abortErr := r.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
-			Bucket:   aws.String(r.bucketName),
-			Key:      aws.String(key),
-			UploadId: uploadID,
-		})
-		if abortErr != nil {
-			return fmt.Errorf("upload failed and abort failed: %v, %v", uploadError, abortErr)
-		}
-		return uploadError
-	}
-
-	// Complete multipart upload
-	_, err = r.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(r.bucketName),
-		Key:      aws.String(key),
-		UploadId: uploadID,
-		MultipartUpload: &types.CompletedMultipartUpload{
-			Parts: completedParts,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return fmt.Errorf("failed to upload file with manager: %w", err)
 	}
 
 	return nil
-}
-
-// uploadWorker processes chunks concurrently
-func (r *R2Client) uploadWorker(ctx context.Context, wg *sync.WaitGroup, key string, uploadID *string, chunkChan <-chan []byte, resultChan chan<- ChunkUploadResult) {
-	defer wg.Done()
-
-	partNumber := int32(1)
-
-	for chunk := range chunkChan {
-		result := ChunkUploadResult{PartNumber: partNumber}
-
-		resp, err := r.client.UploadPart(ctx, &s3.UploadPartInput{
-			Bucket:     aws.String(r.bucketName),
-			Key:        aws.String(key),
-			PartNumber: aws.Int32(partNumber),
-			UploadId:   uploadID,
-			Body:       bytes.NewReader(chunk),
-		})
-
-		if err != nil {
-			result.Error = err
-		} else {
-			result.ETag = *resp.ETag
-		}
-
-		resultChan <- result
-		partNumber++
-	}
 }
 
 // Download streams a file from R2 with optimized performance
@@ -294,8 +211,8 @@ func (r *R2Client) GetObjectInfo(ctx context.Context, key string) (*s3.HeadObjec
 func DefaultUploadOptions() UploadOptions {
 	return UploadOptions{
 		ContentType:     "application/octet-stream",
-		ChunkSize:       5 * 1024 * 1024, // 5MB chunks
-		MaxConcurrency:  4,               // 4 concurrent uploads
+		ChunkSize:       16 * 1024 * 1024, // 16MB chunks for better throughput
+		MaxConcurrency:  8,                // 8 concurrent uploads for maximum performance
 		EnableMultipart: true,
 		Metadata:        make(map[string]string),
 	}
