@@ -1,5 +1,6 @@
 services:
   sefud:
+    container_name: sefud-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,7 +37,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SEFUD_DB_USER:-user}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${SEFUD_DB_USER:-user} -d ${SEFUD_DB_NAME:-sefud}",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
