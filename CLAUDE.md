@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**sefud** is a high-performance, encrypted file upload & download service written in Go, featuring Cloudflare R2 storage, MinIO local development, and 6-character file IDs. The project has evolved from basic stub implementations to a production-ready service with significant performance optimizations.
+**sefud** is a high-performance, encrypted file upload & download service written in Go, featuring Cloudflare Storage, MinIO local development, and 6-character file IDs. The project has evolved from basic stub implementations to a production-ready service with significant performance optimizations.
 
 ## Recent Major Updates (August 2025)
 
@@ -142,9 +142,8 @@ open http://localhost:9001  # MinIO Console (minioadmin/minioadmin123)
 ```bash
 # Application
 SEFUD_APP_PORT=7000
-SEFUD_STORAGE_PATH=./uploads
-SEFUD_MIME_BLACKLIST=application/x-sh,application/x-msdownload,application/x-executable
-SEFUD_MAX_UPLOAD_SIZE=104857600  # 100MB default
+SEFUD_APP_MIME_BLACKLIST=application/x-sh,application/x-msdownload,application/x-executable
+SEFUD_APP_MAX_UPLOAD_SIZE=104857600  # 100MB default
 
 # Database
 SEFUD_DB_USER=user
@@ -156,18 +155,18 @@ SEFUD_DB_PORT=5432
 # MinIO (Local Development - Active by default)
 MINIO_API_PORT=9000
 MINIO_CONSOLE_PORT=9001
-SEFUD_R2_ACCESS_KEY_ID=minioadmin
-SEFUD_R2_SECRET_ACCESS_KEY=minioadmin123
-SEFUD_R2_BUCKET_NAME=sefud-files
-SEFUD_R2_ENDPOINT=http://localhost:9000
-SEFUD_R2_REGION=us-east-1
+SEFUD_STORAGE_ACCESS_KEY_ID=minioadmin
+SEFUD_STORAGE_SECRET_ACCESS_KEY=minioadmin123
+SEFUD_STORAGE_BUCKET_NAME=sefud-files
+SEFUD_STORAGE_ENDPOINT=http://localhost:9000
+SEFUD_STORAGE_REGION=us-east-1
 
 # Cloudflare R2 (Production - Commented out by default)
-# SEFUD_R2_ACCESS_KEY_ID=your_r2_access_key_id
-# SEFUD_R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
-# SEFUD_R2_BUCKET_NAME=your-bucket-name
-# SEFUD_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
-# SEFUD_R2_REGION=auto
+# SEFUD_STORAGE_ACCESS_KEY_ID=your_r2_access_key_id
+# SEFUD_STORAGE_SECRET_ACCESS_KEY=your_r2_secret_access_key
+# SEFUD_STORAGE_BUCKET_NAME=your-bucket-name
+# SEFUD_STORAGE_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+# SEFUD_STORAGE_REGION=auto
 ```
 
 ### Docker Compose Services

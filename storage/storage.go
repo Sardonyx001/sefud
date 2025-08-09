@@ -1,4 +1,4 @@
-// Package storage provides high-performance storage operations using Cloudflare R2.
+// Package storage provides high-performance storage operations.
 package storage
 
 import (
@@ -20,14 +20,13 @@ import (
 	sefudConfig "github.com/Sardonyx001/sefud/config"
 )
 
-// R2Client provides high-performance R2 storage operations
-type R2Client struct {
+// StorageClient provides high-performance Storage operations
+type StorageClient struct {
 	client     *s3.Client
 	uploader   *manager.Uploader
 	bucketName string
 	mu         sync.RWMutex
 }
-
 
 // UploadOptions configures upload behavior for performance optimization
 type UploadOptions struct {
@@ -38,9 +37,9 @@ type UploadOptions struct {
 	Metadata        map[string]string
 }
 
-// NewR2Client creates a new high-performance R2 client
-func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
-	// Create optimized HTTP client for R2
+// NewStorageClient creates a new high-performance Storageclient
+func NewStorageClient(cfg *sefudConfig.Config) (*StorageClient, error) {
+	// Create optimized HTTP client
 	httpClient := &http.Client{
 		Timeout: 10 * time.Minute,
 		Transport: &http.Transport{
@@ -58,14 +57,14 @@ func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
 		},
 	}
 
-	// Create AWS config for Cloudflare R2 with optimizations
+	// Create AWS config for Storage with optimizations
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			cfg.R2.AccessKeyID,
-			cfg.R2.SecretAccessKey,
+			cfg.Storage.AccessKeyID,
+			cfg.Storage.SecretAccessKey,
 			"",
 		)),
-		config.WithRegion(cfg.R2.Region),
+		config.WithRegion(cfg.Storage.Region),
 		config.WithHTTPClient(httpClient),
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(retry.NewStandard(), 2) // Reduce retries for speed
@@ -75,28 +74,28 @@ func NewR2Client(cfg *sefudConfig.Config) (*R2Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	// Create S3 client with custom endpoint for R2
+	// Create S3 client with custom endpoint
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(cfg.R2.Endpoint)
+		o.BaseEndpoint = aws.String(cfg.Storage.Endpoint)
 		o.UsePathStyle = true // Required for R2
 	})
 
-	// Create uploader with disabled checksums for R2 performance
+	// Create uploader with disabled checksums for performance
 	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
 		u.PartSize = 16 * 1024 * 1024 // 16MB parts
 		u.Concurrency = 8             // 8 concurrent uploads
 		u.LeavePartsOnError = false   // Clean up failed uploads
 	})
 
-	return &R2Client{
+	return &StorageClient{
 		client:     client,
 		uploader:   uploader,
-		bucketName: cfg.R2.BucketName,
+		bucketName: cfg.Storage.BucketName,
 	}, nil
 }
 
 // Upload performs high-performance file upload with automatic chunking
-func (r *R2Client) Upload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
+func (r *StorageClient) Upload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -105,12 +104,12 @@ func (r *R2Client) Upload(ctx context.Context, key string, reader io.Reader, opt
 		return r.simpleUpload(ctx, key, reader, opts)
 	}
 
-	// Use S3 manager for multipart uploads (optimized for R2)
+	// Use S3 manager for multipart uploads (optimized for performance)
 	return r.managerUpload(ctx, key, reader, opts)
 }
 
 // simpleUpload performs a direct upload for smaller files
-func (r *R2Client) simpleUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
+func (r *StorageClient) simpleUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucketName),
 		Key:         aws.String(key),
@@ -131,8 +130,8 @@ func (r *R2Client) simpleUpload(ctx context.Context, key string, reader io.Reade
 	return nil
 }
 
-// managerUpload uses AWS S3 manager for optimized R2 uploads
-func (r *R2Client) managerUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
+// managerUpload uses AWS S3 manager for optimized uploads
+func (r *StorageClient) managerUpload(ctx context.Context, key string, reader io.Reader, opts UploadOptions) error {
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucketName),
 		Key:         aws.String(key),
@@ -153,8 +152,8 @@ func (r *R2Client) managerUpload(ctx context.Context, key string, reader io.Read
 	return nil
 }
 
-// Download streams a file from R2 with optimized performance
-func (r *R2Client) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+// Download streams a file from Storage with optimized performance
+func (r *StorageClient) Download(ctx context.Context, key string) (io.ReadCloser, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -171,8 +170,8 @@ func (r *R2Client) Download(ctx context.Context, key string) (io.ReadCloser, err
 	return resp.Body, nil
 }
 
-// Delete removes a file from R2
-func (r *R2Client) Delete(ctx context.Context, key string) error {
+// Delete removes a file
+func (r *StorageClient) Delete(ctx context.Context, key string) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -189,8 +188,8 @@ func (r *R2Client) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// GetObjectInfo retrieves file metadata from R2
-func (r *R2Client) GetObjectInfo(ctx context.Context, key string) (*s3.HeadObjectOutput, error) {
+// GetObjectInfo retrieves file metadata from Storage
+func (r *StorageClient) GetObjectInfo(ctx context.Context, key string) (*s3.HeadObjectOutput, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

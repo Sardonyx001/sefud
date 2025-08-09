@@ -43,7 +43,6 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 		})
 	}
 
-
 	// Get delete token from query parameter or header
 	deleteToken := c.QueryParam("token")
 	if deleteToken == "" {
@@ -113,22 +112,22 @@ func (h *FileHandler) DeleteFile(c echo.Context) error {
 		})
 	}
 
-	// Delete from R2 storage asynchronously to avoid blocking the response
-	// If R2 deletion fails, we can handle cleanup later via a background job
+	// Delete from storage asynchronously to avoid blocking the response
+	// If Storage deletion fails, we can handle cleanup later via a background job
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		if err := h.R2Client.Delete(ctx, fileRecord.R2Key); err != nil {
+		if err := h.StorageClient.Delete(ctx, fileRecord.StorageKey); err != nil {
 			// Log the error for monitoring/cleanup processes
 			// In production, you might want to queue this for retry
 			// or store failed deletions for manual cleanup
-			c.Logger().Errorf("Failed to delete file %s from R2 storage: %v", publicID, err)
+			c.Logger().Errorf("Failed to delete file %s from storage: %v", publicID, err)
 
 			// Optionally, you could store failed deletions in a cleanup queue
-			// h.enqueueCleanupTask(fileRecord.R2Key, fileRecord.ID)
+			// h.enqueueCleanupTask(fileRecord.StorageKey, fileRecord.ID)
 		} else {
-			c.Logger().Infof("Successfully deleted file %s from R2 storage", publicID)
+			c.Logger().Infof("Successfully deleted file %s from storage", publicID)
 		}
 	}()
 
@@ -158,8 +157,8 @@ func (h *FileHandler) CleanupExpiredFiles(ctx context.Context) error {
 			continue // Log error and continue with next file
 		}
 
-		// Delete from R2 storage
-		if err := h.R2Client.Delete(ctx, file.R2Key); err != nil {
+		// Delete from storage
+		if err := h.StorageClient.Delete(ctx, file.StorageKey); err != nil {
 			// Log error but don't fail the entire cleanup process
 			continue
 		}
@@ -178,7 +177,6 @@ func (h *FileHandler) GetFileInfo(c echo.Context) error {
 			Code:  "MISSING_FILE_ID",
 		})
 	}
-
 
 	// Retrieve file metadata from database using short_id
 	var fileRecord models.File

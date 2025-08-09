@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// File represents a file stored in R2 with metadata in the database
+// File represents a file stored in Storage with metadata in the database
 type File struct {
 	// Primary key - UUID as string
 	ID string `gorm:"type:uuid;primary_key" json:"id"`
@@ -20,9 +20,9 @@ type File struct {
 	ContentType  string `gorm:"not null" json:"content_type"`
 	Size         int64  `gorm:"not null" json:"size"`
 
-	// R2 storage information
-	R2Key    string `gorm:"not null;unique" json:"r2_key"`
-	R2Bucket string `gorm:"not null" json:"r2_bucket"`
+	// Storage information
+	StorageKey    string `gorm:"not null;unique" json:"storage_key"`
+	StorageBucket string `gorm:"not null" json:"storage_bucket"`
 
 	// Security and access
 	DeleteToken string     `gorm:"not null;unique" json:"delete_token"`

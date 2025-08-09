@@ -24,7 +24,7 @@ const docTemplate = `{
     "paths": {
         "/up": {
             "post": {
-                "description": "Upload a file to R2 storage with high-performance chunked upload",
+                "description": "Upload a file to Storage with high-performance chunked upload",
                 "consumes": [
                     "multipart/form-data"
                 ],

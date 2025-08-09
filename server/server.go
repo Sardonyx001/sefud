@@ -19,11 +19,11 @@ import (
 )
 
 type Server struct {
-	echo        *echo.Echo
-	db          *gorm.DB
-	config      *config.Config
-	r2Client    *storage.R2Client
-	fileHandler *handlers.FileHandler
+	echo          *echo.Echo
+	db            *gorm.DB
+	config        *config.Config
+	storageClient *storage.StorageClient
+	fileHandler   *handlers.FileHandler
 }
 
 func New(cfg *config.Config) (*Server, error) {
@@ -42,14 +42,14 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to migrate short IDs: %w", err)
 	}
 
-	// Initialize R2 client
-	r2Client, err := storage.NewR2Client(cfg)
+	// Initialize storage client
+	storageClient, err := storage.NewStorageClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize file handler with dependencies
-	fileHandler := handlers.NewFileHandler(database, r2Client, cfg)
+	fileHandler := handlers.NewFileHandler(database, storageClient, cfg)
 
 	// Middleware
 	e.Use(logger.InitLoggerMiddleware())
@@ -73,11 +73,11 @@ func New(cfg *config.Config) (*Server, error) {
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	return &Server{
-		echo:        e,
-		db:          database,
-		config:      cfg,
-		r2Client:    r2Client,
-		fileHandler: fileHandler,
+		echo:          e,
+		db:            database,
+		config:        cfg,
+		storageClient: storageClient,
+		fileHandler:   fileHandler,
 	}, nil
 }
 

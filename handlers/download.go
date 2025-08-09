@@ -64,7 +64,7 @@ func (h *FileHandler) DownloadFile(c echo.Context) error {
 		})
 	}
 
-	// Get file from R2 with timeout
+	// Get file from Storage with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -87,7 +87,7 @@ func (h *FileHandler) DownloadFile(c echo.Context) error {
 		}
 	} else {
 		// Full file download
-		reader, err = h.R2Client.Download(ctx, fileRecord.R2Key)
+		reader, err = h.StorageClient.Download(ctx, fileRecord.StorageKey)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "Failed to retrieve file from storage",
@@ -163,7 +163,7 @@ func (h *FileHandler) handleRangeRequest(ctx context.Context, fileRecord *models
 
 	// For now, we'll get the full file and return a section reader
 	// In a production system, you might want to use S3's range request capabilities
-	fullReader, err := h.R2Client.Download(ctx, fileRecord.R2Key)
+	fullReader, err := h.StorageClient.Download(ctx, fileRecord.StorageKey)
 	if err != nil {
 		return nil, 0, http.StatusInternalServerError, err
 	}
