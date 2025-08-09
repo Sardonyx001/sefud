@@ -34,7 +34,6 @@ type UploadResponse struct {
 	ID           string     `json:"id"`
 	OriginalName string     `json:"original_name"`
 	Size         int64      `json:"size"`
-	ContentType  string     `json:"content_type"`
 	URL          string     `json:"url"`
 	DeleteToken  string     `json:"delete_token"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
@@ -49,31 +48,31 @@ type ErrorResponse struct {
 
 // FileHandler contains dependencies for file operations
 type FileHandler struct {
-	DB       *gorm.DB
-	R2Client *storage.R2Client
-	Config   *config.Config
-	sqids    *sqids.Sqids
+	DB            *gorm.DB
+	StorageClient *storage.StorageClient
+	Config        *config.Config
+	sqids         *sqids.Sqids
 }
 
 // NewFileHandler creates a new file handler with dependencies
-func NewFileHandler(db *gorm.DB, r2Client *storage.R2Client, cfg *config.Config) *FileHandler {
+func NewFileHandler(db *gorm.DB, storageClient *storage.StorageClient, cfg *config.Config) *FileHandler {
 	// Create sqids instance with custom alphabet for shorter, URL-safe IDs
 	s, _ := sqids.New(sqids.Options{
 		MinLength: 6, // Exactly 6 characters
 		Alphabet:  "FxnXM1kBN6cuhsAvjW3Co7l2RePyY8DwaU04Tzt9fHQrqSVKdpimLGIJOgb5ZE",
 	})
-	
+
 	return &FileHandler{
-		DB:       db,
-		R2Client: r2Client,
-		Config:   cfg,
-		sqids:    s,
+		DB:            db,
+		StorageClient: storageClient,
+		Config:        cfg,
+		sqids:         s,
 	}
 }
 
 // UploadFile handles file upload requests with high-performance processing
 // @Summary Upload a file
-// @Description Upload a file to R2 storage with high-performance chunked upload
+// @Description Upload a file to storage with high-performance chunked upload
 // @Tags files
 // @Accept multipart/form-data
 // @Produce json
@@ -137,7 +136,6 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	// Generate UUID for database, short ID for public
 	fileUUID := uuid.New().String()
 	publicID := h.generateShortID()
-	
 	// Ensure short ID is unique (retry if collision)
 	for {
 		var existingFile models.File
@@ -149,7 +147,7 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 		publicID = h.generateShortID()
 	}
 	deleteToken := h.generateDeleteToken()
-	r2Key := h.generateR2Key(fileUUID, fileHeader.Filename)
+	storageKey := h.generateStorageKey(fileUUID, fileHeader.Filename)
 
 	// Parse expiration if provided
 	var expiresAt *time.Time
@@ -176,7 +174,6 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 
 	// Setup upload options for performance
 	uploadOpts := storage.DefaultUploadOptions()
-	uploadOpts.ContentType = contentType
 	uploadOpts.Metadata = map[string]string{
 		"original-name": fileHeader.Filename,
 		"file-id":       fileUUID,
@@ -185,23 +182,22 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 
 	// Use multipart upload for all files > 5MB for better performance through parallelization
 	uploadOpts.EnableMultipart = fileHeader.Size > 5*1024*1024 // 5MB threshold
-	
-	log.Info("Upload configuration", "file_size", fileHeader.Size, "multipart", uploadOpts.EnableMultipart, 
+
+	log.Info("Upload configuration", "file_size", fileHeader.Size, "multipart", uploadOpts.EnableMultipart,
 		"chunk_size", uploadOpts.ChunkSize, "concurrency", uploadOpts.MaxConcurrency)
 
-	// Upload to R2
+	// Upload to storage
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Create seekable reader for upload
 	fileReader := bytes.NewReader(fileData)
-	
+
 	uploadStart := time.Now()
-	log.Info("Starting R2 upload", "file_id", publicID, "size", fileHeader.Size)
-	err = h.R2Client.Upload(ctx, r2Key, fileReader, uploadOpts)
+	log.Info("Starting upload", "file_id", publicID, "size", fileHeader.Size)
+	err = h.StorageClient.Upload(ctx, storageKey, fileReader, uploadOpts)
 	uploadDuration := time.Since(uploadStart)
-	log.Info("R2 upload completed", "file_id", publicID, "duration", uploadDuration)
-	
+	log.Info("Upload completed", "file_id", publicID, "duration", uploadDuration)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to upload file to storage",
@@ -220,8 +216,8 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 		OriginalName:   fileHeader.Filename,
 		ContentType:    contentType,
 		Size:           fileHeader.Size,
-		R2Key:          r2Key,
-		R2Bucket:       h.Config.R2.BucketName,
+		StorageKey:     storageKey,
+		StorageBucket:  h.Config.Storage.BucketName,
 		DeleteToken:    deleteToken,
 		ExpiresAt:      expiresAt,
 		UploadIP:       c.RealIP(),
@@ -233,11 +229,11 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 
 	// Save to database
 	if err := h.DB.Create(fileRecord).Error; err != nil {
-		// If DB save fails, try to cleanup R2 upload
+		// If DB save fails, try to cleanup Storage upload
 		go func() {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cleanupCancel()
-			h.R2Client.Delete(cleanupCtx, r2Key)
+			h.StorageClient.Delete(cleanupCtx, storageKey)
 		}()
 
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -253,7 +249,6 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 		ID:           publicID,
 		OriginalName: fileHeader.Filename,
 		Size:         fileHeader.Size,
-		ContentType:  contentType,
 		URL:          baseURL + "/" + publicID,
 		DeleteToken:  deleteToken,
 		ExpiresAt:    expiresAt,
@@ -276,7 +271,6 @@ func (h *FileHandler) generateShortID() string {
 	// Generate a smaller random number that will encode to exactly 6 characters
 	// With 62-char alphabet, 6 chars can represent up to 62^6 = ~56 billion combinations
 	randomNum := uint64(rand.Uint64() % 56_800_000_000) // Stay well under the limit
-	
 	id, _ := h.sqids.Encode([]uint64{randomNum})
 	// Ensure it's exactly 6 characters by padding if needed
 	for len(id) < 6 {
@@ -292,8 +286,8 @@ func (h *FileHandler) generateDeleteToken() string {
 	return hex.EncodeToString(bytes)
 }
 
-// generateR2Key creates a unique key for R2 storage
-func (h *FileHandler) generateR2Key(fileID, originalName string) string {
+// generateStorageKey creates a unique key for storage
+func (h *FileHandler) generateStorageKey(fileID, originalName string) string {
 	ext := filepath.Ext(originalName)
 	timestamp := time.Now().Format("2006/01/02")
 	return fmt.Sprintf("%s/%s%s", timestamp, fileID, ext)

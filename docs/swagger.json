@@ -1,274 +1,255 @@
 {
-    "schemes": [
-        "http",
-        "https"
-    ],
-    "swagger": "2.0",
-    "info": {
-        "description": "Simple, encrypted file upload \u0026 download service",
-        "title": "sefud API",
-        "contact": {
-            "name": "API Support",
-            "url": "https://github.com/Sardonyx001/sefud"
-        },
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-        },
-        "version": "1.0"
+  "schemes": ["http", "https"],
+  "swagger": "2.0",
+  "info": {
+    "description": "Simple, encrypted file upload \u0026 download service",
+    "title": "sefud API",
+    "contact": {
+      "name": "API Support",
+      "url": "https://github.com/Sardonyx001/sefud"
     },
-    "host": "localhost:7000",
-    "basePath": "/",
-    "paths": {
-        "/up": {
-            "post": {
-                "description": "Upload a file to R2 storage with high-performance chunked upload",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "files"
-                ],
-                "summary": "Upload a file",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "File to upload",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Expiration duration (e.g., '24h', '7d')",
-                        "name": "expires",
-                        "in": "formData"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "File uploaded successfully",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UploadResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request - invalid file or parameters",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "413": {
-                        "description": "File too large",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "415": {
-                        "description": "Unsupported media type",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/{id}": {
-            "get": {
-                "description": "Download a file by its ID with streaming support and range requests",
-                "produces": [
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "files"
-                ],
-                "summary": "Download a file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "File ID (UUID)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Range header for partial content requests",
-                        "name": "Range",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "File content",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "206": {
-                        "description": "Partial file content",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid file ID",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "File not found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "410": {
-                        "description": "File expired",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Delete a file by its ID using delete token for authorization",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "files"
-                ],
-                "summary": "Delete a file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "File ID (UUID)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Delete token for authorization",
-                        "name": "token",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "File deleted successfully",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.DeleteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request parameters",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid delete token",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "File not found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "410": {
-                        "description": "File already deleted or expired",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        }
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
     },
-    "definitions": {
-        "handlers.DeleteResponse": {
-            "type": "object",
-            "properties": {
-                "deleted_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
+    "version": "1.0"
+  },
+  "host": "localhost:7000",
+  "basePath": "/",
+  "paths": {
+    "/up": {
+      "post": {
+        "description": "Upload a file to Storage with high-performance chunked upload",
+        "consumes": ["multipart/form-data"],
+        "produces": ["application/json"],
+        "tags": ["files"],
+        "summary": "Upload a file",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "File to upload",
+            "name": "file",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Expiration duration (e.g., '24h', '7d')",
+            "name": "expires",
+            "in": "formData"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully",
+            "schema": {
+              "$ref": "#/definitions/handlers.UploadResponse"
             }
-        },
-        "handlers.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "details": {
-                    "type": "string"
-                },
-                "error": {
-                    "type": "string"
-                }
+          },
+          "400": {
+            "description": "Bad request - invalid file or parameters",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
-        },
-        "handlers.UploadResponse": {
-            "type": "object",
-            "properties": {
-                "content_type": {
-                    "type": "string"
-                },
-                "delete_token": {
-                    "type": "string"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "original_name": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                },
-                "url": {
-                    "type": "string"
-                }
+          },
+          "413": {
+            "description": "File too large",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
             }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
         }
+      }
+    },
+    "/{id}": {
+      "get": {
+        "description": "Download a file by its ID with streaming support and range requests",
+        "produces": ["application/octet-stream"],
+        "tags": ["files"],
+        "summary": "Download a file",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "File ID (UUID)",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Range header for partial content requests",
+            "name": "Range",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "schema": {
+              "type": "file"
+            }
+          },
+          "206": {
+            "description": "Partial file content",
+            "schema": {
+              "type": "file"
+            }
+          },
+          "400": {
+            "description": "Invalid file ID",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "410": {
+            "description": "File expired",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete a file by its ID using delete token for authorization",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["files"],
+        "summary": "Delete a file",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "File ID (UUID)",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Delete token for authorization",
+            "name": "token",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File deleted successfully",
+            "schema": {
+              "$ref": "#/definitions/handlers.DeleteResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Invalid delete token",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "410": {
+            "description": "File already deleted or expired",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/handlers.ErrorResponse"
+            }
+          }
+        }
+      }
     }
+  },
+  "definitions": {
+    "handlers.DeleteResponse": {
+      "type": "object",
+      "properties": {
+        "deleted_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "handlers.ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "handlers.UploadResponse": {
+      "type": "object",
+      "properties": {
+        "content_type": {
+          "type": "string"
+        },
+        "delete_token": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "original_name": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }

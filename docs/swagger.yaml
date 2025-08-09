@@ -139,7 +139,7 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Upload a file to R2 storage with high-performance chunked upload
+      description: Upload a file to R2/S3 compatible storage with high-performance chunked upload
       parameters:
       - description: File to upload
         in: formData

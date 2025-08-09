@@ -6,19 +6,18 @@ services:
       dockerfile: Dockerfile
     environment:
       - SEFUD_APP_PORT=${SEFUD_APP_PORT:-7000}
-      - SEFUD_STORAGE_PATH=${SEFUD_STORAGE_PATH:-/uploads}
-      - SEFUD_MIME_BLACKLIST=${SEFUD_MIME_BLACKLIST:-application/x-msdownload,application/x-sh}
-      - SEFUD_MAX_UPLOAD_SIZE=${SEFUD_MAX_UPLOAD_SIZE:-104857600}
+      - SEFUD_APP_MIME_BLACKLIST=${SEFUD_APP_MIME_BLACKLIST:-application/x-msdownload,application/x-sh}
+      - SEFUD_APP_MAX_UPLOAD_SIZE=${SEFUD_APP_MAX_UPLOAD_SIZE:-104857600}
       - SEFUD_DB_USER=${SEFUD_DB_USER:-user}
       - SEFUD_DB_PASSWORD=${SEFUD_DB_PASSWORD:-password}
       - SEFUD_DB_NAME=${SEFUD_DB_NAME:-sefud}
       - SEFUD_DB_HOST=postgres
       - SEFUD_DB_PORT=5432
-      - SEFUD_R2_ACCESS_KEY_ID=${SEFUD_R2_ACCESS_KEY_ID:-minioadmin}
-      - SEFUD_R2_SECRET_ACCESS_KEY=${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123}
-      - SEFUD_R2_BUCKET_NAME=${SEFUD_R2_BUCKET_NAME:-sefud-files}
-      - SEFUD_R2_ENDPOINT=${SEFUD_R2_ENDPOINT:-http://minio:9000}
-      - SEFUD_R2_REGION=${SEFUD_R2_REGION:-us-east-1}
+      - SEFUD_STORAGE_ACCESS_KEY_ID=${SEFUD_STORAGE_ACCESS_KEY_ID:-minioadmin}
+      - SEFUD_STORAGE_SECRET_ACCESS_KEY=${SEFUD_STORAGE_SECRET_ACCESS_KEY:-minioadmin123}
+      - SEFUD_STORAGE_BUCKET_NAME=${SEFUD_STORAGE_BUCKET_NAME:-sefud-files}
+      - SEFUD_STORAGE_ENDPOINT=${SEFUD_STORAGE_ENDPOINT:-http://minio:9000}
+      - SEFUD_STORAGE_REGION=${SEFUD_STORAGE_REGION:-us-east-1}
     ports:
       - "${SEFUD_APP_PORT:-7000}:${SEFUD_APP_PORT:-7000}"
     depends_on:
@@ -53,8 +52,8 @@ services:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: ${SEFUD_R2_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123}
+      MINIO_ROOT_USER: ${SEFUD_STORAGE_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${SEFUD_STORAGE_SECRET_ACCESS_KEY:-minioadmin123}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -73,8 +72,8 @@ services:
     entrypoint: >
       /bin/sh -c "
       sleep 10;
-      /usr/bin/mc alias set minio http://minio:9000 ${SEFUD_R2_ACCESS_KEY_ID:-minioadmin} ${SEFUD_R2_SECRET_ACCESS_KEY:-minioadmin123};
-      /usr/bin/mc mb minio/${SEFUD_R2_BUCKET_NAME:-sefud-files} --ignore-existing;
+      /usr/bin/mc alias set minio http://minio:9000 ${SEFUD_STORAGE_ACCESS_KEY_ID:-minioadmin} ${SEFUD_STORAGE_SECRET_ACCESS_KEY:-minioadmin123};
+      /usr/bin/mc mb minio/${SEFUD_STORAGE_BUCKET_NAME:-sefud-files} --ignore-existing;
       echo 'MinIO setup complete';
       "
 

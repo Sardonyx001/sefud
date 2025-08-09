@@ -13,7 +13,7 @@ import (
 type Config struct {
 	Database DBConfig
 	App      AppConfig
-	R2       R2Config
+	Storage  StorageConfig
 }
 
 func NewConfig() *Config {
@@ -25,7 +25,7 @@ func NewConfig() *Config {
 	return &Config{
 		Database: LoadDBConfig(),
 		App:      LoadAppConfig(),
-		R2:       LoadR2Config(),
+		Storage:  LoadStorageConfig(),
 	}
 }
 
