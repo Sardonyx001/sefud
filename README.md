@@ -356,6 +356,7 @@ time http -f POST :7000/up file@tests/data/test_15mb.bin
 - [x] **Database Migration**: Automatic short_id migration for existing records
 - [x] **HTTP Client Optimization**: Custom client with connection pooling
 - [x] **Smart Upload Logic**: Size-based upload strategy selection
+- [x] **Package releases**: Releases on new pushes to main via Github
 
 ### Planned 🎯
 
