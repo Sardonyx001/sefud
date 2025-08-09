@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**sefud** is a high-performance, encrypted file upload & download service written in Go, featuring Cloudflare Storage, MinIO local development, and 6-character file IDs. The project has evolved from basic stub implementations to a production-ready service with significant performance optimizations.
+
+**sefud** is a high-performance, encrypted file upload & download service written in Go, featuring Cloudflare R2 storage, MinIO local development, and 6-character file IDs. The project has evolved from basic stub implementations to a production-ready service with significant performance optimizations.
 
 ## Recent Major Updates (August 2025)
 

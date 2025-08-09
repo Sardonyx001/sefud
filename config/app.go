@@ -19,6 +19,14 @@ type StorageConfig struct {
 	Region          string
 }
 
+type R2Config struct {
+	AccessKeyID     string
+	SecretAccessKey string
+	BucketName      string
+	Endpoint        string
+	Region          string
+}
+
 func LoadAppConfig() AppConfig {
 	return AppConfig{
 		Port:          GetEnv("SEFUD_APP_PORT", "7000"),

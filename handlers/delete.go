@@ -178,6 +178,7 @@ func (h *FileHandler) GetFileInfo(c echo.Context) error {
 		})
 	}
 
+
 	// Retrieve file metadata from database using short_id
 	var fileRecord models.File
 	err := h.DB.Where("short_id = ?", publicID).First(&fileRecord).Error

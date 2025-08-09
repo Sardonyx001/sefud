@@ -136,7 +136,6 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	// Generate UUID for database, short ID for public
 	fileUUID := uuid.New().String()
 	publicID := h.generateShortID()
-
 	// Ensure short ID is unique (retry if collision)
 	for {
 		var existingFile models.File
@@ -199,7 +198,6 @@ func (h *FileHandler) UploadFile(c echo.Context) error {
 	err = h.StorageClient.Upload(ctx, storageKey, fileReader, uploadOpts)
 	uploadDuration := time.Since(uploadStart)
 	log.Info("Upload completed", "file_id", publicID, "duration", uploadDuration)
-
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to upload file to storage",
@@ -273,7 +271,6 @@ func (h *FileHandler) generateShortID() string {
 	// Generate a smaller random number that will encode to exactly 6 characters
 	// With 62-char alphabet, 6 chars can represent up to 62^6 = ~56 billion combinations
 	randomNum := uint64(rand.Uint64() % 56_800_000_000) // Stay well under the limit
-
 	id, _ := h.sqids.Encode([]uint64{randomNum})
 	// Ensure it's exactly 6 characters by padding if needed
 	for len(id) < 6 {

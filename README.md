@@ -1,6 +1,6 @@
 # sefud: high-performance file upload & download service
 
-A blazingly fast, secure file upload and download service built with Go, featuring Cloudflare Storage, MinIO local development, and high-performance concurrent processing with short 6-character file IDs.
+A blazingly fast, secure file upload and download service built with Go, featuring Cloudflare R2, MinIO local development, and high-performance concurrent processing with short 6-character file IDs.
 
 ## 🚀 Features
 
